@@ -1,0 +1,79 @@
+subprojects {
+  afterEvaluate { download(it) }
+}
+
+/****************下载依赖源码-start*******************/
+static void download(Project project) {
+    def overwrite = project.tasks.findByName('DownloadAllSources') != null
+    project.tasks.create(name: 'DownloadAllSources', overwrite: overwrite) {
+        doLast {
+            def repoList = project.repositories.toList()
+            project.configurations.all { Configuration conf ->
+                if (conf.name.contains("api")
+                        || conf.name.contains("compile")
+                        || conf.name.contains("compileOnly")
+                        || conf.name.contains("implementation")) {
+                    conf.getDependencies().toList().forEach({ dep ->
+                        if (checkValid(dep)) {
+                            def depSources = "${dep.group}:${dep.name}:${dep.version}:sources"
+                            downloadSourcesTemp(project, depSources, repoList)
+                        }
+                    })
+                }
+            }
+
+        }
+    }
+}
+
+static boolean checkValid(Dependency it) {
+    return !(it == null || it.group == null || it.name == null || it.version == null)
+}
+
+static void downloadSourcesTemp(Project project, String depSources, List<ArtifactRepository> repoList) {
+    def configuration = null
+    def repoName = null
+    def repository = repoList.find {
+        repoName = "$it.name"
+        //project.logger.lifecycle("Attempt to download sources from $repoName" + repoName + " ----- $depSources")
+        project.repositories.clear()
+        project.repositories.add(it)
+        configuration = project.configurations.create('downloadSourcesFrom_' + UUID.randomUUID())
+        configuration.transitive = false
+        project.dependencies.add(configuration.name, depSources)
+        def files = null
+        try {
+            files = configuration.resolvedConfiguration.lenientConfiguration.getFiles()
+        } catch (Throwable ignore) {
+        }
+        return files && !files.isEmpty()
+    }
+    if (repository != null) {
+        configuration = project.configurations.create('downloadSources_' + UUID.randomUUID())
+        configuration.transitive = false
+        project.dependencies.add(configuration.name, depSources)
+        configuration.resolve()
+    } else {
+        if (depSources.endsWith("sources")) {
+            def depSource = depSources.replace("sources", "source")
+            downloadSourcesTemp(project, depSource, repoList)
+            return
+        }
+    }
+    try {
+        def sourcesPath = configuration?.singleFile?.path
+        if (sourcesPath) {
+            project.logger.lifecycle('Sources were downloaded to ' + sourcesPath)
+        } else {
+            if (depSources.endsWith("sources")) {
+                def depSource = depSources.replace("sources", "source")
+                downloadSourcesTemp(depSource)
+            } else {
+                throw new RuntimeException('Sources download failed')
+            }
+        }
+    } catch (Throwable e) {
+        project.logger.log(LogLevel.ERROR, "downlod failed($repoName)::::$depSources")
+    }
+}
+/****************下载依赖源码-end*******************/
