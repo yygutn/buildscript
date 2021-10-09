@@ -1,3 +1,4 @@
+//下载依赖源码脚本,fork from- AS [DownloadSource] task
 subprojects {
   afterEvaluate { download(it) }
 }
