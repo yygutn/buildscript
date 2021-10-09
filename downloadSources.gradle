@@ -43,7 +43,7 @@ static void downloadSourcesTemp(Project project, String depSources, List<Artifac
     def repoName = null
     def repository = repoList.find {
         repoName = "$it.name"
-        project.logger.lifecycle("Attempt to download sources from $repoName ----- $depSources")
+        //project.logger.lifecycle("Attempt to download sources from $repoName ----- $depSources")
         project.repositories.clear()
         project.repositories.add(it)
         configuration = project.configurations.create('downloadSourcesFrom_' + UUID.randomUUID())
